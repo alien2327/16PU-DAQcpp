@@ -15,7 +15,9 @@ struct RBCP_HEADER{
     unsigned char address_1;
     unsigned char address_2;
     unsigned char address_3;
-    unsigned int *data;
+    unsigned char data_0;
+    unsigned char data_1;
+    unsigned char data_2;
 };
 
 #define RBCP_VER 0xFF //0b1111 + 0b1111
@@ -90,9 +92,11 @@ int main(int argc, char* argv[]) {
     int rtnValue;
     int address;
     int check;
-    RBCP_HEADER SiTCPHeader;
+
     unsigned int RBCPPPort;
     unsigned int TCPPort = TCP_PORT;
+
+    int count = 0;
 
     int mode = 3;
     int dataNumber;
@@ -105,16 +109,19 @@ int main(int argc, char* argv[]) {
         SiTCPAddr = argv[1];
         RBCPPPort = atoi(argv[2]);
         address = atoi(argv[3]);
-        SiTCPHeader.version = RBCP_VER;
-    }
 
-    if (address != 0) {
-        if (check=ConnectionCheck(SiTCPAddr, RBCPPPort, &SiTCPHeader)<0){
-            address = 0;
-        }
     }
 
     while(true) {
+        RBCP_HEADER SiTCPHeader;
+        SiTCPHeader.version = RBCP_VER;
+        if (address != 0 && count == 0) {
+            check = ConnectionCheck(SiTCPAddr, RBCPPPort, &SiTCPHeader);
+            if (check < 0){
+                address = 0;
+            }
+            count++;
+        }
         printf("16PU-address#%d@DAQsystem$ ", address);
         fgets(tempKeyBuf, MAX_LINE_LENGTH, stdin);
         if ((rtnValue = myScanf(tempKeyBuf,szVerb, szArg1, szArg2)) < 0) {
@@ -132,7 +139,6 @@ int main(int argc, char* argv[]) {
 int CommandList(char* pszVerb, char* pszArg1, char* pszArg2, char *ipAddr, unsigned int rbcpPort, unsigned int tcpPort, int addr, struct RBCP_HEADER* header, int *dispMode, int *datanumber) {
 
     int sock_udp;
-    unsigned int param[4];
     header->id = 1;
 
     if (strcmp(pszVerb, "set") == 0) {
@@ -145,15 +151,15 @@ int CommandList(char* pszVerb, char* pszArg1, char* pszArg2, char *ipAddr, unsig
             }
         } else if (strcmp(pszArg1, "delay") == 0) {
             if (strcmp(pszArg2, "") != 0) {
-                param[3] = 0x3F & atoi(pszArg2);
-
                 header->flag = RBCP_WR_CMD;
                 header->length = 1;
                 header->address_0 = 0;
                 header->address_1 = 0;
                 header->address_2 = 0;
                 header->address_3 = 38;
-                header->data = param;
+                header->data_0 = 0x3F & atoi(pszArg2);
+                header->data_1 = 0;
+                header->data_2 = 0;  
                 return SendCommand(ipAddr, rbcpPort, header);
             } else {
                 puts("Parameter error. See help.");
@@ -161,17 +167,15 @@ int CommandList(char* pszVerb, char* pszArg1, char* pszArg2, char *ipAddr, unsig
             }
         } else if (strcmp(pszArg1, "number") == 0) {
             if (strcmp(pszArg2, "") != 0) {
-                param[3] = (char)(0xFF & atoi(pszArg2));
-                param[2] = (char)((0xFF00 & atoi(pszArg2))>>8);
-                param[1] = (char)((0xFF0000 & atoi(pszArg2))>>16);
-
                 header->flag = RBCP_WR_CMD;
                 header->length = 1;
                 header->address_0 = 0;
                 header->address_1 = 0;
                 header->address_2 = 0;
                 header->address_3 = 33;
-                header->data = param;
+                header->data_0 = (char)((0x00FF0000 & atoi(pszArg2))>>16);
+                header->data_1 = (char)((0x0000FF00 & atoi(pszArg2))>>8);
+                header->data_2 = (char)(0x000000FF & atoi(pszArg2));            
                 return SendCommand(ipAddr, rbcpPort, header);
             } else {
                 puts("Parameter error. See help.");
@@ -181,16 +185,15 @@ int CommandList(char* pszVerb, char* pszArg1, char* pszArg2, char *ipAddr, unsig
             if (strcmp(pszArg2, "") != 0) {
                 for (int ch = 0; ch < Channel; ch++) {
                     cout << "Ch " << ch << " : ";
-                    param[3]= (char)(0xFF & (32768 * atoi(pszArg2)));
-                    param[2]= (char)((0xFF00 & (32768 * atoi(pszArg2)))>>8);
-
                     header->flag = RBCP_WR_CMD;
                     header->length = 1;
                     header->address_0 = 0xFF;
                     header->address_1 = 0xFF;
                     header->address_2 = 0xFF;
-                    header->address_3 = 0x10;
-                    header->data = param;
+                    header->address_3 = (unsigned char)(ch * 2 + 1);
+                    header->data_0 = (char)((0x0000FF00 & (32768 * atoi(pszArg2)))>>8);
+                    header->data_1 = (char)(0x000000FF & (32768 * atoi(pszArg2)));
+                    header->data_2 = 0;
                     SendCommand(ipAddr, rbcpPort, header);
                 }
                 return 0;
@@ -207,15 +210,15 @@ int CommandList(char* pszVerb, char* pszArg1, char* pszArg2, char *ipAddr, unsig
     } else if (strcmp(pszVerb, "trigger") == 0) {
         return Trigger(ipAddr, rbcpPort, header);
     } else if (strcmp(pszVerb, "reset") == 0) {
-        param[3] = 0x80;
-
         header->flag = RBCP_WR_CMD;
         header->length = 1;
         header->address_0 = 0xFF;
         header->address_1 = 0xFF;
         header->address_2 = 0xFF;
         header->address_3 = 0x10;
-        header->data = param;
+        header->data_0 = 0x80;
+        header->data_1 = 0;
+        header->data_2 = 0;
         return SendCommand(ipAddr, rbcpPort, header);
     } else if (strcmp(pszVerb, "ipconfig") == 0) {
         return ShowIp(ipAddr, rbcpPort, tcpPort, addr);
@@ -261,8 +264,6 @@ int ConnectionCheck(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHea
 
     memcpy(sndBuf, sendHeader, sizeof(struct RBCP_HEADER));
     packetLen = sizeof(struct RBCP_HEADER);
-
-    
 
     sendto(sock, sndBuf, packetLen, 0, (struct sockaddr *)&sitcpAddr, sizeof(sitcpAddr));
     puts("The packet have been sent!");
@@ -333,7 +334,6 @@ int SetMode(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader, cha
 
     struct sockaddr_in sitcpAddr;
     int dispMode;
-    unsigned int param[4];
     int sock;
     char sndBuf[RBCP_BUF_SIZE];
     int packetLen;
@@ -361,11 +361,16 @@ int SetMode(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader, cha
 
     sendHeader->flag = RBCP_WR_CMD;
     sendHeader->length = 1;
-    param[4] = 0xFF & dispMode;
-    sendHeader->data = param;
+    sendHeader->data_0 = 0xFF & dispMode;;
+    sendHeader->data_1 = 0;
+    sendHeader->data_2 = 0;
 
     memcpy(sndBuf, sendHeader, sizeof(struct RBCP_HEADER));
     packetLen = sizeof(struct RBCP_HEADER);
+
+    sendto(sock, sndBuf, packetLen, 0, (struct sockaddr *)&sitcpAddr, sizeof(sitcpAddr));
+    puts("The packet have been sent!");
+    puts("Wait to receive the ACK packet...");
 
     struct timeval timeout;
     fd_set setSelect;
@@ -381,10 +386,6 @@ int SetMode(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader, cha
         return 0;
     }
 
-    sendto(sock, sndBuf, packetLen, 0, (struct sockaddr *)&sitcpAddr, sizeof(sitcpAddr));
-    puts("The packet have been sent!");
-    puts("Wait to receive the ACK packet...");
-
     rcvdBytes = recv(sock, rcvdBuf, UDP_BUF_SIZE, 0);
 
     sendHeader->id++;
@@ -393,10 +394,7 @@ int SetMode(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader, cha
 }
 
 int Trigger(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader) {
-
     struct sockaddr_in sitcpAddr;
-    unsigned int param[4];
-
     int sock;
     char sndBuf[RBCP_BUF_SIZE];
     int packetLen;
@@ -412,9 +410,9 @@ int Trigger(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader) {
     sendHeader->flag = RBCP_WR_CMD;
     sendHeader->length = 1;
     sendHeader->address_3 = 37;
-
-    param[3] = 1;
-    sendHeader->data = param;
+    sendHeader->data_0 = 1;
+    sendHeader->data_1 = 0;
+    sendHeader->data_2 = 0;
 
     memcpy(sndBuf, sendHeader, sizeof(struct RBCP_HEADER));
     packetLen = sizeof(struct RBCP_HEADER);
@@ -438,17 +436,18 @@ int Trigger(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader) {
     rcvdBytes = recv(sock, rcvdBuf, UDP_BUF_SIZE, 0);
 
     sendHeader->id++;
-    sendHeader->data = 0;
+    sendHeader->data_0 = 0;
 
     memcpy(sndBuf, sendHeader, sizeof(struct RBCP_HEADER));
     packetLen = sizeof(struct RBCP_HEADER);
 
     sendto(sock, sndBuf, packetLen, 0, (struct sockaddr *)&sitcpAddr, sizeof(sitcpAddr));
-    puts("Test trigger executed");
-
+    
     rcvdBytes = recv(sock, rcvdBuf, UDP_BUF_SIZE, 0);
 
     sendHeader->id++;
+
+    puts("Test trigger executed");
 
     return 0;
 }
@@ -495,6 +494,11 @@ int SendCommand(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader)
     sitcpAddr.sin_port        = htons(port);
     sitcpAddr.sin_addr.s_addr = inet_addr(ipAddr);
 
+    memcpy(sndBuf, sendHeader, sizeof(struct RBCP_HEADER));
+    packetLen = sizeof(struct RBCP_HEADER);
+
+    sendto(sock, sndBuf, packetLen, 0, (struct sockaddr *)&sitcpAddr, sizeof(sitcpAddr));
+
     struct timeval timeout;
     fd_set setSelect;
 
@@ -509,12 +513,6 @@ int SendCommand(char* ipAddr, unsigned int port, struct RBCP_HEADER* sendHeader)
         return 0;
     }
 
-    memcpy(sndBuf, sendHeader, sizeof(struct RBCP_HEADER));
-    packetLen = sizeof(struct RBCP_HEADER);
-
-    
-
-    sendto(sock, sndBuf, packetLen, 0, (struct sockaddr *)&sitcpAddr, sizeof(sitcpAddr));
     rcvdBytes = recv(sock, rcvdBuf, UDP_BUF_SIZE, 0);
 
     puts("Done");
