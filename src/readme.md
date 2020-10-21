@@ -17,6 +17,12 @@
 
 ## New
 
+1. Test server for FPGA is created.
+
 ## Changed
+
+1. RBCPのデータのための型を変更
+2. タイムアウトされる順番を変更
+3. RBCPをコマンドを入力する毎回初期化されるように変更
 
 ## Note
