@@ -376,7 +376,6 @@ int ConnectionCheck(struct RBCP_HEADER* sendHeader) {
     int rcvdBytes;
     char rcvdBuf[1024];
     int numReTrans =0;
-
     sendHeader->flag = RBCP_RD_CMD;
     sendHeader->id++;
     sendHeader->length = 40;
@@ -387,14 +386,10 @@ int ConnectionCheck(struct RBCP_HEADER* sendHeader) {
     sendHeader->data_0 = 0;
     sendHeader->data_1 = 0;
     sendHeader->data_2 = 0;
-
     puts("\nChecking connection...");
-
-    udp0.udp_bind();
     udp0.udp_send(sendHeader);
     puts("The packet have been sent!");
     puts("Wait to receive the ACK packet...");
-
     while(numReTrans < 5) {
         int n = udp0.udp_select();
         if (n == -1) {
@@ -407,6 +402,7 @@ int ConnectionCheck(struct RBCP_HEADER* sendHeader) {
                 return -1;
             }
         } else {
+            udp0.udp_bind();
             udp0.udp_recv(rcvdBuf, 1024);
             if (rcvdBytes<sizeof(struct RBCP_HEADER)) {
                 puts("ERROR: ACK packet is too short");
@@ -442,20 +438,18 @@ int SetMode(struct RBCP_HEADER* sendHeader, char* pszArg2) {
     int dispMode;
     int rcvdBytes;
     char rcvdBuf[1024];
-
     if (strcmp(pszArg2, "process") == 0) {
         puts("Setting mode to process...");
         dispMode = 0;
-        }
+    }
     else if (strcmp(pszArg2, "wave") == 0) {
         puts("Setting mode to wave...");
         dispMode = 2;
-        }
+    }
     else if (strcmp(pszArg2, "ready") == 0) {
         puts("Setting mode to ready...");
         dispMode = 3;
-        }
-
+    }
     sendHeader->flag = RBCP_WR_CMD;
     sendHeader->length = 1;
     sendHeader->addr_0 = 0;
@@ -465,19 +459,16 @@ int SetMode(struct RBCP_HEADER* sendHeader, char* pszArg2) {
     sendHeader->data_0 = 0xFF & dispMode;;
     sendHeader->data_1 = 0;
     sendHeader->data_2 = 0;
-    udp0.udp_bind();
     udp0.udp_send(sendHeader);
     puts("The packet have been sent!");
     puts("Wait to receive the ACK packet...");
-
     int sele = udp0.udp_select();
     if (sele < 0) {
         return 0;
     }
-
+    udp0.udp_bind();
     udp0.udp_recv(rcvdBuf, 1024);
     sendHeader->id++;
-
     return 0;
 }
 
@@ -493,12 +484,12 @@ int Trigger(struct RBCP_HEADER* sendHeader) {
     sendHeader->data_0 = 1;
     sendHeader->data_1 = 0;
     sendHeader->data_2 = 0;
-    udp0.udp_bind();
     udp0.udp_send(sendHeader);
     int sele = udp0.udp_select();
     if (sele < 0) {
         return 0;
     }
+    udp0.udp_bind();
     udp0.udp_recv(rcvdBuf, 1024);
     sendHeader->id++;
     sendHeader->data_0 = 0;
@@ -510,12 +501,12 @@ int Trigger(struct RBCP_HEADER* sendHeader) {
 
 int SendCommand(struct RBCP_HEADER* sendHeader) {
     char rcvdBuf[1024];
-    udp0.udp_bind();
     udp0.udp_send(sendHeader);
     int sele = udp0.udp_select();
     if (sele < 0) {
         return 0;
     }
+    udp0.udp_bind();
     udp0.udp_recv(rcvdBuf, 1024);
     puts("Done");
     sendHeader->id++;
