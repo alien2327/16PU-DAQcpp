@@ -8,9 +8,9 @@ FPGAの特有の通信システムのSiTCPのRBCP(Remote Bus Control Protcol)を
 コンパイルした後、以下のように起動する。
 
 ```
-% ./a.out <IP address> <Port number> <16PU address number>
+% ./a.out <16PU address number>
 
-% ./a.out 10.72.108.42 4660 13
+% ./a.out 13
 ```
 
 IP住所は上記のように設定されていて、RBCPのポート番号はデフォルトの4660になっている。  
